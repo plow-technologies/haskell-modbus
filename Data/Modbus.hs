@@ -226,9 +226,17 @@ wrappedGet FC3   = standardByteStringGet
 wrappedGet FC4   = standardByteStringGet
 wrappedGet FC5   = standardWord16Get
 wrappedGet FC6   = standardWord16Get
+wrappedGet FC7   = standardWord16Get
 wrappedGet FC8   = standardWord16Get
+wrappedGet FC9  = standardWord16Get
+wrappedGet FC10 = standardWord16Get
+wrappedGet FC11 = standardWord16Get
+wrappedGet FC12 = standardWord16Get
+wrappedGet FC13 = standardWord16Get
+wrappedGet FC14 = standardWord16Get
 wrappedGet FC15  = standardWord16Get
 wrappedGet FC16  = standardWord16Get
+wrappedGet (FCUnknown fn) = undefined
 
 
 

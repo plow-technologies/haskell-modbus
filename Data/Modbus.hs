@@ -155,7 +155,7 @@ data GModResponse address result  =
    | WriteMultipleCoilsResponse (ModbusAction address result )
    | WriteMultipleRegistersResponse (ModbusAction address result )
    | ExceptionResponse FunctionCode ExceptionCode
-   | UnknownFunctionResponse FunctionCode
+   | UnknownFunctionResponse (ModbusAction address result)
             deriving (Show)
 
 
@@ -182,44 +182,113 @@ type ModResponse = GModResponse StandardAddress StandardResult
 --      deriving (Show)
 
 
+data ModbusSerializeInterface address result = ModbusSerializeInterface
+            { interfaceForGet :: ModbusFunctionCode ->
+                                 (ModbusAction address result -> GModResponse address result ) ->
+                                 Get (GModResponse address result)}
+
+standardInterface ::
+    ModbusSerializeInterface StandardAddress StandardResult
+standardInterface = ModbusSerializeInterface wrappedGet
+
+withInterfaceGet serializationInterface = do
+        fn <- getWord8
+        case fn of
+            1  -> f  FC1 ReadCoilsResponse
+            2  -> f  FC2 ReadDiscreteInputsResponse
+            3  -> f  FC3 ReadHoldingRegistersResponse
+            4  -> f  FC4 ReadInputRegistersResponse
+            5  -> f  FC5 WriteSingleCoilResponse
+            6  -> f  FC6 WriteSingleRegisterResponse
+            7  -> f  FC7 WriteDiagnosticRegisterResponse
+            8  -> f  FC8 UnknownFunctionResponse
+            9  -> f  FC9 UnknownFunctionResponse
+            10 -> f  FC10 UnknownFunctionResponse
+            11 -> f  FC11 UnknownFunctionResponse
+            12 -> f  FC12 UnknownFunctionResponse
+            13 -> f  FC13 UnknownFunctionResponse
+            14 -> f  FC14 UnknownFunctionResponse
+            15 -> f  FC15 WriteMultipleCoilsResponse
+            16 -> f  FC16 WriteMultipleRegistersResponse
+            x | x >= 0x80 -> ExceptionResponse (x - 0x80) <$> get
+            _  -> f (FCUnknown fn) UnknownFunctionResponse
+      where
+        f  = interfaceForGet serializationInterface
+
+
+
+wrappedGet ::
+  ModbusFunctionCode
+  -> (ModbusAction StandardAddress StandardResult -> b) -> Get b
+wrappedGet FC1   = standardByteStringGet
+wrappedGet FC2   = standardByteStringGet
+wrappedGet FC3   = standardByteStringGet
+wrappedGet FC4   = standardByteStringGet
+wrappedGet FC5   = standardWord16Get
+wrappedGet FC6   = standardWord16Get
+wrappedGet FC8   = standardWord16Get
+wrappedGet FC15  = standardWord16Get
+wrappedGet FC16  = standardWord16Get
+
+
+
+
+-- standardByteStringGet :: (a1 -> (b1 -> b) -> Get b
 standardByteStringGet cons = do
  count <- getWord8
  body  <- getBytes (fromIntegral count)
- return $ cons  (ModbusAction (AddressWord8 count) (ResultByteString body))
+ return $ cons . ModbusAction (AddressWord8 count) $ (ResultByteString body)
+
+
+standardWord16Get  cons = do
+ addr <- getWord16be
+ body <- getWord16be
+ return $ cons . ModbusAction (AddressWord16 addr) $ (ResultWord16 body)
 
 standardByteStringPut fn (AddressWord8 cnt) (ResultByteString b) = putWord8 fn >> putWord8 cnt >> putByteString b
 standardByteStringPut fn a b = fail ("Trying to put wrong address type in" ++ (show a) ++ (show b))
-
-
-standardWord16Get cons = do
- addr <- getWord16be
- body <- getWord16be
- return $ cons ( ModbusAction (AddressWord16 addr) (ResultWord16 body))
 
 standardWord16Put fn (AddressWord16 addr) (ResultWord16 b) = putWord8 fn >> putWord16be addr >> putWord16be b
 standardWord16Put fn a b = fail ("Trying to put wrong address type in" ++ (show a) ++ (show b))
 
 -- data ModResponse
 
+data ModbusFunctionCode = FC1
+                        | FC2
+                        | FC3
+                        | FC4
+                        | FC5
+                        | FC6
+                        | FC7
+                        | FC8
+                        | FC9
+                        | FC10
+                        | FC11
+                        | FC12
+                        | FC13
+                        | FC14
+                        | FC15
+                        | FC16
+                        | FCUnknown Word8
 
 instance Serialize ModResponse where
     get = do
         fn <- getWord8
         case fn of
-            1  -> f ReadCoilsResponse
-            2  -> f ReadDiscreteInputsResponse
-            3  -> f ReadHoldingRegistersResponse
-            4  -> f ReadInputRegistersResponse
-            5  -> f' WriteSingleCoilResponse
-            6  -> f' WriteSingleRegisterResponse
-            8  -> f' WriteDiagnosticRegisterResponse
-            15 -> f' WriteMultipleCoilsResponse
-            16 -> f' WriteMultipleRegistersResponse
+            1  -> f  FC1 ReadCoilsResponse
+            2  -> f  FC2 ReadDiscreteInputsResponse
+            3  -> f  FC3 ReadHoldingRegistersResponse
+            4  -> f  FC4 ReadInputRegistersResponse
+            5  -> f' FC5 WriteSingleCoilResponse
+            6  -> f' FC6 WriteSingleRegisterResponse
+            8  -> f' FC8 WriteDiagnosticRegisterResponse
+            15 -> f' FC15 WriteMultipleCoilsResponse
+            16 -> f' FC16 WriteMultipleRegistersResponse
             x | x >= 0x80 -> ExceptionResponse (x - 0x80) <$> get
-            _  -> return $ UnknownFunctionResponse fn
+            _  -> f (FCUnknown fn) UnknownFunctionResponse
       where
-        f  = standardByteStringGet
-        f' = standardWord16Get
+        f  = wrappedGet
+        f' = wrappedGet
     put req = case req of
         (ReadCoilsResponse (ModbusAction cnt b))            -> f 1 cnt b
         (ReadDiscreteInputsResponse (ModbusAction cnt b))   -> f 2 cnt b
@@ -235,9 +304,9 @@ instance Serialize ModResponse where
         (ExceptionResponse fn ec)
                        |fn >= 0x80    -> put fn >> put ec
                        |otherwise     -> put (fn + 0x80) >> put ec
-        (UnknownFunctionResponse fn) -> put fn
+        (UnknownFunctionResponse fn) -> undefined --  put fn
       where
-        f = standardByteStringPut
+        f  = standardByteStringPut
         f' = standardWord16Put
 
 

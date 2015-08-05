@@ -1,10 +1,13 @@
 {-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE GADTs                #-}
-{-# LANGUAGE StandaloneDeriving   #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 module Data.Modbus
   ( ModRequest(..)
-  , ModResponse(..)
+  , ModResponse
+  , GModResponse(..)
+  , ModbusAction(..)
+  , StandardAddress(..)
+  , StandardResult(..)
   , ModRequestFrame(..)
   , ModResponseFrame(..)
   , ExceptionCode(..)
@@ -221,7 +224,6 @@ instance Serialize ModResponse where
         (WriteDiagnosticRegisterResponse (ModbusAction (AddressWord16 subfn) (ResultWord16 dat))) ->
             putWord8 8 >> putWord16be subfn >> putWord16be dat
         (WriteDiagnosticRegisterResponse (ModbusAction a b)) -> fail ("WriteDiagnosticRegisterResponseErr" ++ (show a) ++ (show b))
-
         (WriteMultipleCoilsResponse (ModbusAction addr b))     -> f' 15 addr b
         (WriteMultipleRegistersResponse (ModbusAction addr b)) -> f' 16 addr b
         (ExceptionResponse fn ec)

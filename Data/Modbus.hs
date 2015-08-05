@@ -182,13 +182,19 @@ type ModResponse = GModResponse StandardAddress StandardResult
 --      deriving (Show)
 
 
-standardBytestringGet cons = do
-                       count <- getWord8
-                       body  <- getBytes (fromIntegral count)
-                       return $ cons count body
+standardByteStringGet cons = do
+ count <- getWord8
+ body  <- getBytes (fromIntegral count)
+ return $ cons  (ModbusAction (AddressWord8 count) (ResultByteString body))
 
+
+standardWord16Get cons = do
+ addr <- getWord16be
+ body <- getWord16be
+ return $ cons ( ModbusAction (AddressWord16 addr) (ResultWord16 body))
 
 -- data ModResponse
+
 
 instance Serialize ModResponse where
     get = do
@@ -206,14 +212,8 @@ instance Serialize ModResponse where
             x | x >= 0x80 -> ExceptionResponse (x - 0x80) <$> get
             _  -> return $ UnknownFunctionResponse fn
       where
-        f cons = do
-            count <- getWord8
-            body  <- getBytes (fromIntegral count)
-            return $ cons  (ModbusAction (AddressWord8 count) (ResultByteString body))
-        f' cons = do
-            addr <- getWord16be
-            body <- getWord16be
-            return $ cons ( ModbusAction (AddressWord16 addr) (ResultWord16 body))
+        f  = standardByteStringGet
+        f' = standardWord16Get
     put req = case req of
         (ReadCoilsResponse (ModbusAction cnt b))            -> f 1 cnt b
         (ReadDiscreteInputsResponse (ModbusAction cnt b))   -> f 2 cnt b

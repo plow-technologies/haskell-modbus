@@ -230,6 +230,33 @@ withInterfaceGet serializationInterface = do
         f  = interfaceForGet serializationInterface
 
 
+withInterfacePut :: forall address result.
+                          ModbusSerializeInterface address result
+                          -> GModResponse address result -> PutM ()
+withInterfacePut serializationInterface req = case req of
+                                             (ReadCoilsResponse (ModbusAction cnt b))            -> f FC1 1 cnt b
+                                             (ReadDiscreteInputsResponse (ModbusAction cnt b))   -> f FC2 2 cnt b
+                                             (ReadHoldingRegistersResponse (ModbusAction cnt b)) -> f FC3 3 cnt b
+                                             (ReadInputRegistersResponse (ModbusAction cnt b))   -> f FC4 4 cnt b
+                                             (WriteSingleCoilResponse (ModbusAction addr b))     -> f FC5 5 addr b
+                                             (WriteSingleRegisterResponse (ModbusAction addr b)) -> f FC6 6 addr b
+                                             (WriteDiagnosticRegisterResponse (ModbusAction subfcn dat)) -> f FC8 8 subfcn dat
+                                             (WriteMultipleCoilsResponse (ModbusAction addr b))     -> f FC15 15 addr b
+                                             (WriteMultipleRegistersResponse (ModbusAction addr b)) -> f FC16 16 addr b
+                                             (ExceptionResponse fn ec)
+                                                            |fn >= 0x80    -> put fn >> put ec
+                                                            |otherwise     -> put (fn + 0x80) >> put ec
+                                             (UnknownFunctionResponse _fn) -> undefined --  put fn
+                    where
+                      f  = interfaceForPut serializationInterface
+
+
+
+
+
+
+
+
 
 wrappedGet ::
   ModbusFunctionCode
@@ -262,7 +289,8 @@ wrappedPut FC4   = standardByteStringPut
 wrappedPut FC5   = standardWord16Put
 wrappedPut FC6   = standardWord16Put
 wrappedPut FC7   = standardWord16Put
-wrappedPut FC8   = standardWord16Put
+wrappedPut FC8   = (\wd  (AddressWord16 subfn) (ResultWord16 dat) ->
+                      putWord8 wd >> putWord16be subfn >> putWord16be dat)
 wrappedPut FC9  = standardWord16Put
 wrappedPut FC10 = standardWord16Put
 wrappedPut FC11 = standardWord16Put

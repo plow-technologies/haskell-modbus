@@ -220,6 +220,8 @@ instance Serialize ModResponse where
         (WriteSingleRegisterResponse (ModbusAction addr b)) -> f' 6 addr b
         (WriteDiagnosticRegisterResponse (ModbusAction (AddressWord16 subfn) (ResultWord16 dat))) ->
             putWord8 8 >> putWord16be subfn >> putWord16be dat
+        (WriteDiagnosticRegisterResponse (ModbusAction a b)) -> fail ("WriteDiagnosticRegisterResponseErr" ++ (show a) ++ (show b))
+
         (WriteMultipleCoilsResponse (ModbusAction addr b))     -> f' 15 addr b
         (WriteMultipleRegistersResponse (ModbusAction addr b)) -> f' 16 addr b
         (ExceptionResponse fn ec)

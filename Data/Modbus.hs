@@ -1,3 +1,7 @@
+{-# LANGUAGE FlexibleInstances    #-}
+{-# LANGUAGE GADTs                #-}
+{-# LANGUAGE StandaloneDeriving   #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 module Data.Modbus
   ( ModRequest(..)
   , ModResponse(..)
@@ -5,19 +9,18 @@ module Data.Modbus
   , ModResponseFrame(..)
   , ExceptionCode(..)
   , mkException
-  , matches
   , ModRegister
   , SlaveId
   , FunctionCode
   ) where
 
-import Control.Applicative
-import Control.Monad
-import Data.ByteString (ByteString)
-import qualified Data.ByteString as B
-import Data.Digest.CRC16
-import Data.Serialize
-import Data.Word
+import           Control.Applicative
+import           Control.Monad
+import           Data.ByteString     (ByteString)
+import qualified Data.ByteString     as B
+import           Data.Digest.CRC16
+import           Data.Serialize
+import           Data.Word
 
 type ModRegister = Word16
 type SlaveId = Word8
@@ -25,9 +28,9 @@ type FunctionCode = Word8
 
 -- | Record naming scheme
 -- | q -> for request
--- | r for response 
+-- | r for response
 
--- | modR -> mod register 
+-- | modR -> mod register
 
 data ModRequestFrame = ModRequestFrame { qSlaveId ::SlaveId , qModRequest :: ModRequest} deriving (Show)
 data ModResponseFrame = ModResponseFrame {rSlaveId :: SlaveId, qModResponse ::ModResponse} deriving (Show)
@@ -41,7 +44,7 @@ instance Serialize ModResponseFrame where
     put (ModResponseFrame fid req) = putFrame fid req
 
 putFrame :: Serialize a => Word8 -> a -> PutM ()
-putFrame fid req = 
+putFrame fid req =
     putWord8 fid >> putByteString body >> putWord16le (crc16 packet)
   where
     body = encode req
@@ -57,28 +60,30 @@ getFrame cons = do
   where
     crc' fid req = crc16 . B.unpack . B.cons fid $ encode req
 
--- Frame Response has to be split out for encoding problems                   
+-- Frame Response has to be split out for encoding problems
 
 -- | Check that the given response is appropriate for the given request.
-matches :: ModRequest -> ModResponse -> Bool
-matches req res = case (req, res) of
-    (ReadCoils{},                 ReadCoilsResponse{})                 -> True
-    (ReadDiscreteInputs{},        ReadDiscreteInputsResponse{})        -> True
-    (ReadHoldingRegisters _ a,    ReadHoldingRegistersResponse b _)    -> 
-        fromIntegral b == 2 * a -- 2 response bytes per point
-    (ReadInputRegisters{},        ReadInputRegistersResponse{})        -> True
-    (WriteSingleCoil a _,         WriteSingleCoilResponse b _)         -> a == b 
-    (WriteSingleRegister a _,     WriteSingleRegisterResponse b _)     -> a == b
-    (WriteDiagnosticRegister a _, WriteDiagnosticRegisterResponse b _) -> a == b
-    (WriteMultipleCoils{},        WriteMultipleCoilsResponse{})        -> True
-    (WriteMultipleRegisters{},    WriteMultipleRegistersResponse{})    -> True
-    -- TODO: should check that request fn code matches exception 
-    (_,                           ExceptionResponse{})                 -> True
-    (_,                           UnknownFunctionResponse{})           -> True
-    _                                                                  -> False
+-- matches :: ModRequest -> ModResponse -> Bool
+-- matches req res = case (req, res) of
+--     (ReadCoils{},                 ReadCoilsResponse{})                 -> True
+--     (ReadDiscreteInputs{},        ReadDiscreteInputsResponse{})        -> True
+--     (ReadHoldingRegisters _ a,    ReadHoldingRegistersResponse b _)    ->
+--         fromIntegral b == 2 * a -- 2 response bytes per point
+--     (ReadInputRegisters{},        ReadInputRegistersResponse{})        -> True
+--     (WriteSingleCoil a _,         WriteSingleCoilResponse b _)         -> a == b
+--     (WriteSingleRegister a _,     WriteSingleRegisterResponse b _)     -> a == b
+--     (WriteDiagnosticRegister a _, WriteDiagnosticRegisterResponse b _) -> a == b
+--     (WriteMultipleCoils{},        WriteMultipleCoilsResponse{})        -> True
+--     (WriteMultipleRegisters{},    WriteMultipleRegistersResponse{})    -> True
+--     -- TODO: should check that request fn code matches exception
+--     (_,                           ExceptionResponse{})                 -> True
+--     (_,                           UnknownFunctionResponse{})           -> True
+--     _                                                                  -> False
 
 
-data ModRequest 
+
+
+data ModRequest
     = ReadCoils { readCoilsModReg :: ModRegister, readCoilsCnt:: Word16}
     | ReadDiscreteInputs {readDiscreteInputsModReg :: ModRegister, readDiscreteInputsCnt::Word16}
     | ReadHoldingRegisters{readHoldingRegistersModReg::ModRegister, readHoldingRegistersCnt :: Word16}
@@ -91,7 +96,7 @@ data ModRequest
     deriving (Show)
 
 instance Serialize ModRequest where
-    get = do 
+    get = do
         fn <- getWord8
         case fn of
             1  -> f ReadCoils
@@ -125,26 +130,65 @@ instance Serialize ModRequest where
       where
         f fn w1 w2 = putWord8 fn >> putWord16be w1 >> putWord16be w2
         f' fn addr qnt cnt b = putWord8 fn >> putWord16be addr >>
-            putWord16be qnt >> putWord8 cnt >> putByteString b 
+            putWord16be qnt >> putWord8 cnt >> putByteString b
 
 
 
-data ModResponse 
-    = ReadCoilsResponse {readCoilsResponseCnt ::Word8, readCoilsResponseVal ::ByteString}
-    | ReadDiscreteInputsResponse {readDiscreteInputsResponseCnt :: Word8, readDiscreteInputsResponseVal:: ByteString}
-    | ReadHoldingRegistersResponse {readHoldingRegistersResponseCnt:: Word8 ,readHoldingRegistersResponseVal::ByteString}
-    | ReadInputRegistersResponse {readInputRegistersResponseAddr :: Word8, readInputRegistersResponseVal:: ByteString}
-    | WriteSingleCoilResponse {writeSingleCoilResponseModReg:: ModRegister,  writeSingleCoilResponseVal ::Word16}
-    | WriteSingleRegisterResponse {writeSingleRegisterResponseModReg ::ModRegister, writeSingleRegisterResponseVal ::Word16}
-    | WriteDiagnosticRegisterResponse {writeDiagnosticRegisterResponseSubFcn :: Word16, writeDiagnosticRegisterResponseDat:: Word16}
-    | WriteMultipleCoilsResponse {writeMultipleCoilsResponseModReg ::ModRegister, writeMultipleCoilsResponseVal:: Word16}
-    | WriteMultipleRegistersResponse {writeMultipleRegistersResponseModReg::ModRegister, writeMultipleRegistersResponseVal :: Word16}
-    | ExceptionResponse FunctionCode ExceptionCode
-    | UnknownFunctionResponse FunctionCode
-    deriving (Show)
+
+data ModbusAction address result = ModbusAction { getAddress :: address
+                                                , getResult  :: result}
+
+ deriving (Show )
+
+
+data GModResponse address result  =
+     ReadCoilsResponse  (ModbusAction address result )
+   | ReadDiscreteInputsResponse (ModbusAction address result )
+   | ReadHoldingRegistersResponse (ModbusAction address result )
+   | ReadInputRegistersResponse (ModbusAction address result )
+   | WriteSingleCoilResponse (ModbusAction address result )
+   | WriteSingleRegisterResponse  (ModbusAction address result )
+   | WriteDiagnosticRegisterResponse (ModbusAction address result )
+   | WriteMultipleCoilsResponse (ModbusAction address result )
+   | WriteMultipleRegistersResponse (ModbusAction address result )
+   | ExceptionResponse FunctionCode ExceptionCode
+   | UnknownFunctionResponse FunctionCode
+            deriving (Show)
+
+
+
+data StandardAddress = AddressWord8 Word8 | AddressWord16 Word16
+ deriving (Show)
+data StandardResult = ResultByteString ByteString | ResultWord16 Word16
+ deriving (Show)
+
+type ModResponse = GModResponse StandardAddress StandardResult
+
+-- data ModResponse where
+--    ReadCoilsResponse {readCoilsResponseCnt ::Word8, readCoilsResponseVal ::ByteString                                             }::ModResponse
+--    ReadDiscreteInputsResponse {readDiscreteInputsResponseCnt :: Word8, readDiscreteInputsResponseVal:: ByteString                 }::ModResponse
+--    ReadHoldingRegistersResponse {readHoldingRegistersResponseCnt:: Word8 ,readHoldingRegistersResponseVal::ByteString             }::ModResponse
+--    ReadInputRegistersResponse {readInputRegistersResponseAddr :: Word8, readInputRegistersResponseVal:: ByteString                }::ModResponse
+--    WriteSingleCoilResponse {writeSingleCoilResponseModReg:: ModRegister,  writeSingleCoilResponseVal ::Word16                     }::ModResponse
+--    WriteSingleRegisterResponse {writeSingleRegisterResponseModReg ::ModRegister, writeSingleRegisterResponseVal ::Word16          }::ModResponse
+--    WriteDiagnosticRegisterResponse {writeDiagnosticRegisterResponseSubFcn :: Word16, writeDiagnosticRegisterResponseDat:: Word16  }::ModResponse
+--    WriteMultipleCoilsResponse {writeMultipleCoilsResponseModReg ::ModRegister, writeMultipleCoilsResponseVal:: Word16             }::ModResponse
+--    WriteMultipleRegistersResponse {writeMultipleRegistersResponseModReg::ModRegister, writeMultipleRegistersResponseVal :: Word16 }::ModResponse
+--    ExceptionResponse :: FunctionCode -> ExceptionCode -> ModResponse
+--    UnknownFunctionResponse :: FunctionCode -> ModResponse
+--      deriving (Show)
+
+
+standardBytestringGet cons = do
+                       count <- getWord8
+                       body  <- getBytes (fromIntegral count)
+                       return $ cons count body
+
+
+-- data ModResponse
 
 instance Serialize ModResponse where
-    get = do 
+    get = do
         fn <- getWord8
         case fn of
             1  -> f ReadCoilsResponse
@@ -162,32 +206,33 @@ instance Serialize ModResponse where
         f cons = do
             count <- getWord8
             body  <- getBytes (fromIntegral count)
-            return $ cons count body
+            return $ cons  (ModbusAction (AddressWord8 count) (ResultByteString body))
         f' cons = do
             addr <- getWord16be
             body <- getWord16be
-            return $ cons addr body
+            return $ cons ( ModbusAction (AddressWord16 addr) (ResultWord16 body))
     put req = case req of
-        (ReadCoilsResponse cnt b)            -> f 1 cnt b
-        (ReadDiscreteInputsResponse cnt b)   -> f 2 cnt b
-        (ReadHoldingRegistersResponse cnt b) -> f 3 cnt b
-        (ReadInputRegistersResponse cnt b)   -> f 4 cnt b
-        (WriteSingleCoilResponse addr b)     -> f' 5 addr b
-        (WriteSingleRegisterResponse addr b) -> f' 6 addr b
-        (WriteDiagnosticRegisterResponse subfn dat) -> 
+        (ReadCoilsResponse (ModbusAction cnt b))            -> f 1 cnt b
+        (ReadDiscreteInputsResponse (ModbusAction cnt b))   -> f 2 cnt b
+        (ReadHoldingRegistersResponse (ModbusAction cnt b)) -> f 3 cnt b
+        (ReadInputRegistersResponse (ModbusAction cnt b))   -> f 4 cnt b
+        (WriteSingleCoilResponse (ModbusAction addr b))     -> f' 5 addr b
+        (WriteSingleRegisterResponse (ModbusAction addr b)) -> f' 6 addr b
+        (WriteDiagnosticRegisterResponse (ModbusAction (AddressWord16 subfn) (ResultWord16 dat))) ->
             putWord8 8 >> putWord16be subfn >> putWord16be dat
-        (WriteMultipleCoilsResponse addr b)     -> f' 15 addr b
-        (WriteMultipleRegistersResponse addr b) -> f' 16 addr b
+        (WriteMultipleCoilsResponse (ModbusAction addr b))     -> f' 15 addr b
+        (WriteMultipleRegistersResponse (ModbusAction addr b)) -> f' 16 addr b
         (ExceptionResponse fn ec)
                        |fn >= 0x80    -> put fn >> put ec
                        |otherwise     -> put (fn + 0x80) >> put ec
         (UnknownFunctionResponse fn) -> put fn
       where
-        f fn cnt b = putWord8 fn >> putWord8 cnt >> putByteString b
-        f' fn addr b = putWord8 fn >> putWord16be addr >> putWord16be b
+        f fn (AddressWord8 cnt) (ResultByteString b) = putWord8 fn >> putWord8 cnt >> putByteString b
+        f fn a b = fail ("Trying to put wrong address type in" ++ (show a) ++ (show b))
+        f' fn (AddressWord16 addr) (ResultWord16 b) = putWord8 fn >> putWord16be addr >> putWord16be b
+        f' fn a b = fail ("Trying to put wrong address type in" ++ (show a) ++ (show b))
 
-
-data ExceptionCode 
+data ExceptionCode
     = IllegalFunction
     | IllegalDataAddress
     | IllegalDataValue
@@ -227,5 +272,5 @@ instance Serialize ExceptionCode where
           x    -> UnknownExceptionCode x
 
 mkException :: SlaveId -> ExceptionCode -> ByteString
-mkException slaveId t = encode $ 
+mkException slaveId t = encode $
     ModResponseFrame slaveId $ ExceptionResponse 0x81 t

@@ -187,11 +187,17 @@ standardByteStringGet cons = do
  body  <- getBytes (fromIntegral count)
  return $ cons  (ModbusAction (AddressWord8 count) (ResultByteString body))
 
+standardByteStringPut fn (AddressWord8 cnt) (ResultByteString b) = putWord8 fn >> putWord8 cnt >> putByteString b
+standardByteStringPut fn a b = fail ("Trying to put wrong address type in" ++ (show a) ++ (show b))
+
 
 standardWord16Get cons = do
  addr <- getWord16be
  body <- getWord16be
  return $ cons ( ModbusAction (AddressWord16 addr) (ResultWord16 body))
+
+standardWord16Put fn (AddressWord16 addr) (ResultWord16 b) = putWord8 fn >> putWord16be addr >> putWord16be b
+standardWord16Put fn a b = fail ("Trying to put wrong address type in" ++ (show a) ++ (show b))
 
 -- data ModResponse
 
@@ -231,10 +237,9 @@ instance Serialize ModResponse where
                        |otherwise     -> put (fn + 0x80) >> put ec
         (UnknownFunctionResponse fn) -> put fn
       where
-        f fn (AddressWord8 cnt) (ResultByteString b) = putWord8 fn >> putWord8 cnt >> putByteString b
-        f fn a b = fail ("Trying to put wrong address type in" ++ (show a) ++ (show b))
-        f' fn (AddressWord16 addr) (ResultWord16 b) = putWord8 fn >> putWord16be addr >> putWord16be b
-        f' fn a b = fail ("Trying to put wrong address type in" ++ (show a) ++ (show b))
+        f = standardByteStringPut
+        f' = standardWord16Put
+
 
 data ExceptionCode
     = IllegalFunction

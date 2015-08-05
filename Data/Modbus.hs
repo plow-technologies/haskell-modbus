@@ -340,24 +340,24 @@ instance Serialize ModResponse where
         f  = wrappedGet
         f' = wrappedGet
     put req = case req of
-        (ReadCoilsResponse (ModbusAction cnt b))            -> f 1 cnt b
-        (ReadDiscreteInputsResponse (ModbusAction cnt b))   -> f 2 cnt b
-        (ReadHoldingRegistersResponse (ModbusAction cnt b)) -> f 3 cnt b
-        (ReadInputRegistersResponse (ModbusAction cnt b))   -> f 4 cnt b
-        (WriteSingleCoilResponse (ModbusAction addr b))     -> f' 5 addr b
-        (WriteSingleRegisterResponse (ModbusAction addr b)) -> f' 6 addr b
+        (ReadCoilsResponse (ModbusAction cnt b))            -> f FC1 1 cnt b
+        (ReadDiscreteInputsResponse (ModbusAction cnt b))   -> f FC2 2 cnt b
+        (ReadHoldingRegistersResponse (ModbusAction cnt b)) -> f FC3 3 cnt b
+        (ReadInputRegistersResponse (ModbusAction cnt b))   -> f FC4 4 cnt b
+        (WriteSingleCoilResponse (ModbusAction addr b))     -> f' FC5 5 addr b
+        (WriteSingleRegisterResponse (ModbusAction addr b)) -> f' FC6 6 addr b
         (WriteDiagnosticRegisterResponse (ModbusAction (AddressWord16 subfn) (ResultWord16 dat))) ->
             putWord8 8 >> putWord16be subfn >> putWord16be dat
         (WriteDiagnosticRegisterResponse (ModbusAction a b)) -> fail ("WriteDiagnosticRegisterResponseErr" ++ (show a) ++ (show b))
-        (WriteMultipleCoilsResponse (ModbusAction addr b))     -> f' 15 addr b
-        (WriteMultipleRegistersResponse (ModbusAction addr b)) -> f' 16 addr b
+        (WriteMultipleCoilsResponse (ModbusAction addr b))     -> f' FC15 15 addr b
+        (WriteMultipleRegistersResponse (ModbusAction addr b)) -> f' FC16 16 addr b
         (ExceptionResponse fn ec)
                        |fn >= 0x80    -> put fn >> put ec
                        |otherwise     -> put (fn + 0x80) >> put ec
         (UnknownFunctionResponse _fn) -> undefined --  put fn
       where
-        f  = standardByteStringPut
-        f' = standardWord16Put
+        f  = wrappedPut
+        f' = wrappedPut
 
 
 data ExceptionCode

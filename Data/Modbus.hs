@@ -1,8 +1,16 @@
 {-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE GADTs                #-}
+{-# LANGUAGE RankNTypes           #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 module Data.Modbus
   ( ModRequest(..)
+  , ModbusSerializeInterface(..)
+  , standardInterface
+  , standardByteStringGet
+  , standardWord16Get
+  , standardByteStringPut
+  , standardWord16Put
+  , withInterfaceGet
   , ModResponse
   , GModResponse(..)
   , ModbusAction(..)
@@ -185,12 +193,18 @@ type ModResponse = GModResponse StandardAddress StandardResult
 data ModbusSerializeInterface address result = ModbusSerializeInterface
             { interfaceForGet :: ModbusFunctionCode ->
                                  (ModbusAction address result -> GModResponse address result ) ->
-                                 Get (GModResponse address result)}
+                                 Get (GModResponse address result)
+            , interfaceForPut :: ( ModbusFunctionCode -> Word8 ->
+                                 address -> result -> PutM ())}
 
 standardInterface ::
     ModbusSerializeInterface StandardAddress StandardResult
-standardInterface = ModbusSerializeInterface wrappedGet
+standardInterface = ModbusSerializeInterface wrappedGet wrappedPut
 
+
+withInterfaceGet :: forall address result.
+                          ModbusSerializeInterface address result
+                          -> Get (GModResponse address result)
 withInterfaceGet serializationInterface = do
         fn <- getWord8
         case fn of
@@ -236,28 +250,56 @@ wrappedGet FC13 = standardWord16Get
 wrappedGet FC14 = standardWord16Get
 wrappedGet FC15  = standardWord16Get
 wrappedGet FC16  = standardWord16Get
-wrappedGet (FCUnknown fn) = undefined
+wrappedGet (FCUnknown _fn) = undefined
 
+
+wrappedPut :: ModbusFunctionCode
+                    -> Word8 -> StandardAddress -> StandardResult -> PutM ()
+wrappedPut FC1   = standardByteStringPut
+wrappedPut FC2   = standardByteStringPut
+wrappedPut FC3   = standardByteStringPut
+wrappedPut FC4   = standardByteStringPut
+wrappedPut FC5   = standardWord16Put
+wrappedPut FC6   = standardWord16Put
+wrappedPut FC7   = standardWord16Put
+wrappedPut FC8   = standardWord16Put
+wrappedPut FC9  = standardWord16Put
+wrappedPut FC10 = standardWord16Put
+wrappedPut FC11 = standardWord16Put
+wrappedPut FC12 = standardWord16Put
+wrappedPut FC13 = standardWord16Put
+wrappedPut FC14 = standardWord16Put
+wrappedPut FC15  = standardWord16Put
+wrappedPut FC16  = standardWord16Put
+wrappedPut (FCUnknown _fn) = undefined
 
 
 
 -- standardByteStringGet :: (a1 -> (b1 -> b) -> Get b
+standardByteStringGet :: forall b.
+                               (ModbusAction StandardAddress StandardResult -> b) -> Get b
 standardByteStringGet cons = do
  count <- getWord8
  body  <- getBytes (fromIntegral count)
  return $ cons . ModbusAction (AddressWord8 count) $ (ResultByteString body)
 
 
+standardWord16Get :: forall b.
+                           (ModbusAction StandardAddress StandardResult -> b) -> Get b
 standardWord16Get  cons = do
  addr <- getWord16be
  body <- getWord16be
  return $ cons . ModbusAction (AddressWord16 addr) $ (ResultWord16 body)
 
+standardByteStringPut :: Word8
+                               -> StandardAddress -> StandardResult -> PutM ()
 standardByteStringPut fn (AddressWord8 cnt) (ResultByteString b) = putWord8 fn >> putWord8 cnt >> putByteString b
-standardByteStringPut fn a b = fail ("Trying to put wrong address type in" ++ (show a) ++ (show b))
+standardByteStringPut _ a b = fail ("Trying to put wrong address type in" ++ show a ++ show b)
 
+standardWord16Put :: Word8
+                           -> StandardAddress -> StandardResult -> PutM ()
 standardWord16Put fn (AddressWord16 addr) (ResultWord16 b) = putWord8 fn >> putWord16be addr >> putWord16be b
-standardWord16Put fn a b = fail ("Trying to put wrong address type in" ++ (show a) ++ (show b))
+standardWord16Put _ a b = fail ("Trying to put wrong address type in" ++ show a ++ show b)
 
 -- data ModResponse
 
@@ -312,7 +354,7 @@ instance Serialize ModResponse where
         (ExceptionResponse fn ec)
                        |fn >= 0x80    -> put fn >> put ec
                        |otherwise     -> put (fn + 0x80) >> put ec
-        (UnknownFunctionResponse fn) -> undefined --  put fn
+        (UnknownFunctionResponse _fn) -> undefined --  put fn
       where
         f  = standardByteStringPut
         f' = standardWord16Put

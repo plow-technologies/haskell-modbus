@@ -62,7 +62,7 @@ singleEncode = encode <$> testModRequestEncode 1 1 1 "1"
 singleEncodeResult = ["\SOH\NUL\SOH\NUL\SOH","\STX\NUL\SOH\NUL\SOH","\ETX\NUL\SOH\NUL\SOH","\EOT\NUL\SOH\NUL\SOH","\ENQ\NUL\SOH\NUL\SOH","\ACK\NUL\SOH\NUL\SOH","\b\NUL\SOH\NUL\SOH","\SI\NUL\SOH\NUL\NUL\NUL1111","\DLE\NUL\SOH\NUL\STX\SOH1111"]
 -- |make sure the process works in reverse
 testModRequestDecode :: ByteString -> Either String ModRequest
-testModRequestDecode bs = runGet get bs
+testModRequestDecode = runGet get
 
 singleDecode = testModRequestDecode <$> singleEncodeResult
 
@@ -105,10 +105,10 @@ testModResponseEncode sid adr  wd fc ec = tAllResponses <*> [adr] <*> [wd]
 
 
 testModResponseDecode :: ByteString -> Either String ModResponse
-testModResponseDecode bs = runGet get bs
+testModResponseDecode = runGet get
 
 testModResponseAllExceptions :: SlaveId -> Word8 -> Word16 -> FunctionCode -> [ModResponse]
-testModResponseAllExceptions sid adr wd fc = Prelude.concat $ (testModResponseEncode sid adr wd fc) <$> ecs
+testModResponseAllExceptions sid adr wd fc = Prelude.concat $ testModResponseEncode sid adr wd fc <$> ecs
     where
       ecs :: [ExceptionCode]
       ecs =  [IllegalFunction

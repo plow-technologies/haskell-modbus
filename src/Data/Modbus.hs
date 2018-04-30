@@ -11,7 +11,6 @@ module Data.Modbus
   , FunctionCode
   ) where
 
-import Control.Applicative
 import Control.Monad
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as B

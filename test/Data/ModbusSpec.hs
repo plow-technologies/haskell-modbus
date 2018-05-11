@@ -1,10 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# OPTIONS_GHC -Wno-unused-matches #-}
+
 module Data.ModbusSpec (main, spec) where
 
 import Test.Hspec
 import Data.Modbus
 import Data.Serialize 
-import Control.Applicative
 import Data.Word
 import Data.ByteString
 import Data.Either 
@@ -52,27 +53,32 @@ testModRequestEncode sid modreg val lst = tAllRequests <*> [modreg] <*> [val] --
                        ,tWriteMultipleRegisters  
                      ]
 
-
+testOneWriteMultipleRegs :: ModRequest
 testOneWriteMultipleRegs = WriteMultipleRegisters   1 2 1 "1111"
 
-testDecodeOneWriteMultipleRegs :: Either String ModRequest
-testDecodeOneWriteMultipleRegs = decode . encode $ testOneWriteMultipleRegs
+_testDecodeOneWriteMultipleRegs :: Either String ModRequest
+_testDecodeOneWriteMultipleRegs = decode . encode $ testOneWriteMultipleRegs
 -- A few static checks to make sure there haven't been changes in the way ceral encodes and decodes
+singleEncode :: [ByteString]
 singleEncode = encode <$> testModRequestEncode 1 1 1 "1"
+singleEncodeResult :: [ByteString]
 singleEncodeResult = ["\SOH\NUL\SOH\NUL\SOH","\STX\NUL\SOH\NUL\SOH","\ETX\NUL\SOH\NUL\SOH","\EOT\NUL\SOH\NUL\SOH","\ENQ\NUL\SOH\NUL\SOH","\ACK\NUL\SOH\NUL\SOH","\b\NUL\SOH\NUL\SOH","\SI\NUL\SOH\NUL\NUL\NUL1111","\DLE\NUL\SOH\NUL\STX\SOH1111"]
 -- |make sure the process works in reverse
 testModRequestDecode :: ByteString -> Either String ModRequest
 testModRequestDecode bs = runGet get bs 
 
+singleDecode :: [Either String ModRequest]
 singleDecode = testModRequestDecode <$> singleEncodeResult 
 
 -- | Generate test mod responses 
 
 -- |Static 
+singleEncodeResponse :: [ByteString]
 singleEncodeResponse = encode <$> testModResponseAllExceptions 1 1 1 1 
 singleEncodeResponseResult :: [ByteString]
 singleEncodeResponseResult = ["\SOH\SOH\SOH","\STX\SOH\SOH","\ETX\SOH\SOH","\EOT\SOH\SOH","\ENQ\NUL\SOH\NUL\SOH","\ACK\NUL\SOH\NUL\SOH","\b\NUL\SOH\NUL\SOH","\SI\NUL\SOH\NUL\SOH","\DLE\NUL\SOH\NUL\SOH","\129\SOH","\SOH\SOH\SOH","\STX\SOH\SOH","\ETX\SOH\SOH","\EOT\SOH\SOH","\ENQ\NUL\SOH\NUL\SOH","\ACK\NUL\SOH\NUL\SOH","\b\NUL\SOH\NUL\SOH","\SI\NUL\SOH\NUL\SOH","\DLE\NUL\SOH\NUL\SOH","\129\STX","\SOH\SOH\SOH","\STX\SOH\SOH","\ETX\SOH\SOH","\EOT\SOH\SOH","\ENQ\NUL\SOH\NUL\SOH","\ACK\NUL\SOH\NUL\SOH","\b\NUL\SOH\NUL\SOH","\SI\NUL\SOH\NUL\SOH","\DLE\NUL\SOH\NUL\SOH","\129\ETX","\SOH\SOH\SOH","\STX\SOH\SOH","\ETX\SOH\SOH","\EOT\SOH\SOH","\ENQ\NUL\SOH\NUL\SOH","\ACK\NUL\SOH\NUL\SOH","\b\NUL\SOH\NUL\SOH","\SI\NUL\SOH\NUL\SOH","\DLE\NUL\SOH\NUL\SOH","\129\EOT","\SOH\SOH\SOH","\STX\SOH\SOH","\ETX\SOH\SOH","\EOT\SOH\SOH","\ENQ\NUL\SOH\NUL\SOH","\ACK\NUL\SOH\NUL\SOH","\b\NUL\SOH\NUL\SOH","\SI\NUL\SOH\NUL\SOH","\DLE\NUL\SOH\NUL\SOH","\129\ENQ","\SOH\SOH\SOH","\STX\SOH\SOH","\ETX\SOH\SOH","\EOT\SOH\SOH","\ENQ\NUL\SOH\NUL\SOH","\ACK\NUL\SOH\NUL\SOH","\b\NUL\SOH\NUL\SOH","\SI\NUL\SOH\NUL\SOH","\DLE\NUL\SOH\NUL\SOH","\129\ACK","\SOH\SOH\SOH","\STX\SOH\SOH","\ETX\SOH\SOH","\EOT\SOH\SOH","\ENQ\NUL\SOH\NUL\SOH","\ACK\NUL\SOH\NUL\SOH","\b\NUL\SOH\NUL\SOH","\SI\NUL\SOH\NUL\SOH","\DLE\NUL\SOH\NUL\SOH","\129\b","\SOH\SOH\SOH","\STX\SOH\SOH","\ETX\SOH\SOH","\EOT\SOH\SOH","\ENQ\NUL\SOH\NUL\SOH","\ACK\NUL\SOH\NUL\SOH","\b\NUL\SOH\NUL\SOH","\SI\NUL\SOH\NUL\SOH","\DLE\NUL\SOH\NUL\SOH","\129\n","\SOH\SOH\SOH","\STX\SOH\SOH","\ETX\SOH\SOH","\EOT\SOH\SOH","\ENQ\NUL\SOH\NUL\SOH","\ACK\NUL\SOH\NUL\SOH","\b\NUL\SOH\NUL\SOH","\SI\NUL\SOH\NUL\SOH","\DLE\NUL\SOH\NUL\SOH","\129\v","\SOH\SOH\SOH","\STX\SOH\SOH","\ETX\SOH\SOH","\EOT\SOH\SOH","\ENQ\NUL\SOH\NUL\SOH","\ACK\NUL\SOH\NUL\SOH","\b\NUL\SOH\NUL\SOH","\SI\NUL\SOH\NUL\SOH","\DLE\NUL\SOH\NUL\SOH","\129\255"]
 
+singleDecodeResponse :: [Either String ModResponse]
 singleDecodeResponse = testModResponseDecode <$> singleEncodeResponseResult 
 
 testModResponseEncode :: SlaveId -> Word8  -> Word16-> FunctionCode -> ExceptionCode -> [ModResponse]
@@ -122,5 +128,5 @@ testModResponseAllExceptions sid adr wd fc = Prelude.concat $ (testModResponseEn
            , GatewayTargetFailedToRespond
            , UnknownExceptionCode 0xFF]
 
-testDecodeUnknownExceptionCode :: Either String ExceptionCode
-testDecodeUnknownExceptionCode = decode.encode . UnknownExceptionCode $ 0xFF
+_testDecodeUnknownExceptionCode :: Either String ExceptionCode
+_testDecodeUnknownExceptionCode = decode.encode . UnknownExceptionCode $ 0xFF

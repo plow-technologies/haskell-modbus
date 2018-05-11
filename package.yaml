@@ -1,0 +1,19 @@
+name: haskell-modbus
+version: 0.4.0
+ghc-options:
+- -Wall
+- -Werror
+dependencies:
+- array
+- base
+- bytestring
+- cereal
+library:
+  source-dirs: src
+tests:
+  spec:
+    source-dirs: test
+    main: Spec.hs
+    dependencies:
+    - hspec
+    - haskell-modbus
